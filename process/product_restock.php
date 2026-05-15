@@ -12,19 +12,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-$name     = trim($_POST['name'] ?? '');
-$category = trim($_POST['category'] ?? '');
-$quantity = (int) ($_POST['quantity'] ?? 0);
+$id           = (int) ($_POST['id'] ?? 0);
+$add_quantity = (int) ($_POST['add_quantity'] ?? 0);
 
-if (empty($name) || $quantity < 0) {
+if (!$id || $add_quantity <= 0) {
     header("Location: ../dashboard.php?page=products&error=invalid");
     exit();
 }
 
-$stmt = $conn->prepare("INSERT INTO products (name, quantity, category) VALUES (?, ?, ?)");
-$stmt->bind_param("sis", $name, $quantity, $category);
-$stmt->execute();
+$conn->query("UPDATE products SET quantity = quantity + $add_quantity WHERE id=$id");
 
-header("Location: ../dashboard.php?page=products&success=added");
+header("Location: ../dashboard.php?page=products&success=stocked");
 exit();
 ?>

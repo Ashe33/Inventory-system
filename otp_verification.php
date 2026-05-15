@@ -322,7 +322,7 @@ body::before{
 
     <div class="brand">
         <div class="brand-logo">📦</div>
-        <div class="brand-title">StockFlow IMS</div>
+        <div class="brand-title">StockFlow </div>
     </div>
 
     <div class="card">

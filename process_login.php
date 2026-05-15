@@ -37,7 +37,7 @@ $stmt = $conn->prepare("SELECT * FROM users WHERE username = ?");
 $stmt->bind_param("s", $username);
 $stmt->execute();
 $result = $stmt->get_result();
-$user = $result->fetch_assoc();
+$user   = $result->fetch_assoc();
 
 if (!$user || !password_verify($password, $user['password'])) {
     $_SESSION['login_error'] = "Invalid username or password.";
@@ -52,27 +52,34 @@ if ($user['status'] != 'approved') {
 }
 
 if (!has_internet()) {
-    $_SESSION['login_error'] = "No internet connection detected. An OTP is required to log in. Please check your connection and try again.";
+    $_SESSION['login_error'] = "No internet connection detected. OTP required.";
     header("Location: login.php");
     exit();
 }
 
 if (!$mailerAvailable) {
-    $_SESSION['login_error'] = "Email system unavailable. Run: composer require phpmailer/phpmailer";
+    $_SESSION['login_error'] = "Email system unavailable.";
     header("Location: login.php");
     exit();
 }
 
 if (!$user['email'] || !filter_var($user['email'], FILTER_VALIDATE_EMAIL)) {
-    $_SESSION['login_error'] = "System error: Invalid email on record. Contact administrator.";
+    $_SESSION['login_error'] = "Invalid email on record.";
     header("Location: login.php");
     exit();
 }
 
-$otp = (string) rand(100000, 999999);
-$otp_expiry = time() + 300;
+/* =========================
+   OTP GENERATION
+========================= */
+$otp        = (string) rand(100000, 999999);
+$otp_expiry = time() + 300; // 5 minutes
 
+/* =========================
+   SEND EMAIL
+========================= */
 $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+
 try {
     $mail->isSMTP();
     $mail->Host       = 'smtp.gmail.com';
@@ -86,21 +93,28 @@ try {
     $mail->addAddress($user['email']);
     $mail->isHTML(false);
     $mail->Subject = "StockFlow IMS — Your OTP Code";
-    $mail->Body    = "Hello {$username},\n\nYour one-time login code is: {$otp}\n\nThis code expires in 5 minutes.\n\nIf you did not request this, please ignore this email.";
+    $mail->Body    = "Hello {$user['username']},\n\nYour OTP is: {$otp}\n\nThis code expires in 5 minutes.\n\nIf you did not request this, ignore this email.";
     $mail->send();
 
-} catch (\PHPMailer\PHPMailer\Exception $e) {
-    $_SESSION['login_error'] = "Failed to send OTP email. Please try again. (Error: " . $mail->ErrorInfo . ")";
+} catch (Exception $e) {
+    $_SESSION['login_error'] = "Email failed: " . $mail->ErrorInfo;
     header("Location: login.php");
     exit();
 }
 
+/* =========================
+   SAVE OTP TO DB (after email confirmed sent)
+========================= */
 $stmt2 = $conn->prepare("UPDATE users SET otp = ?, otp_expiry = ? WHERE id = ?");
 $stmt2->bind_param("sii", $otp, $otp_expiry, $user['id']);
 $stmt2->execute();
 
-$_SESSION['temp_user'] = $username;
-$_SESSION['temp_role'] = $user['role'] ?? 'staff';
+/* =========================
+   SAVE TEMP SESSION
+   — use 'temp_user' so otp_verification_process.php can read it
+========================= */
+$_SESSION['temp_user'] = $user['username'];
+$_SESSION['temp_role'] = $user['role'];
 
 header("Location: otp_verification.php");
 exit();

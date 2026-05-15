@@ -17,22 +17,22 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $otp = trim($_POST['otp'] ?? '');
 
-/* Validate */
+/* Validate OTP format */
 if (!ctype_digit($otp) || strlen($otp) != 6) {
     $_SESSION['otp_error'] = "OTP must be exactly 6 digits.";
     header("Location: otp_verification.php");
     exit();
 }
 
-/* Session temp */
+/* Get username from temp session */
 $temp_user = $_SESSION['temp_user'];
 
-/* Get user by USERNAME */
+/* Get user from DB */
 $stmt = $conn->prepare("SELECT * FROM users WHERE username = ?");
 $stmt->bind_param("s", $temp_user);
 $stmt->execute();
 $result = $stmt->get_result();
-$user = $result->fetch_assoc();
+$user   = $result->fetch_assoc();
 
 if (!$user) {
     $_SESSION['otp_error'] = "User not found.";
@@ -40,22 +40,37 @@ if (!$user) {
     exit();
 }
 
-/* Check OTP */
-if ($user['otp'] != $otp) {
+/* Check OTP match */
+if ((string) $user['otp'] !== (string) $otp) {
     $_SESSION['otp_error'] = "Invalid OTP code.";
     header("Location: otp_verification.php");
     exit();
 }
 
-/* Expiration */
-if (time() > $user['otp_expiry']) {
+/* Check expiry */
+$otp_expiry = (int) $user['otp_expiry'];
+$now        = time();
+
+if ($otp_expiry === 0 || $now > $otp_expiry) {
     $_SESSION['otp_error'] = "OTP has expired. Please login again.";
+
+    // Clear expired OTP
+    $stmt_clear = $conn->prepare("UPDATE users SET otp = NULL, otp_expiry = NULL WHERE id = ?");
+    $stmt_clear->bind_param("i", $user['id']);
+    $stmt_clear->execute();
+
     header("Location: login.php");
     exit();
 }
 
 /* SUCCESS — set full session */
-$_SESSION['user'] = $user;
+$_SESSION['user'] = [
+    'id'       => $user['id'],
+    'username' => $user['username'],
+    'email'    => $user['email'],
+    'role'     => strtolower(trim($user['role'])),
+    'status'   => $user['status']
+];
 
 /* Remove temp session */
 unset($_SESSION['temp_user']);
