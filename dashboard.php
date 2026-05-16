@@ -24,11 +24,10 @@ if (!$user) {
 }
 
 /* =========================
-   FIX ROLE SAFETY (IMPORTANT)
+   ROLE SAFETY FIX
 ========================= */
 $role = strtolower(trim($user['role'] ?? 'staff'));
 
-/* OPTIONAL SAFETY: normalize DB value on the fly */
 if (!in_array($role, ['admin', 'manager', 'staff'])) {
     $role = 'staff';
 }
@@ -38,7 +37,21 @@ $_SESSION['user'] = $user;
 $_SESSION['user']['role'] = $role;
 
 $page = $_GET['page'] ?? 'home';
+
+/* =========================
+   UNREAD NOTIFICATION COUNT (for topbar badge)
+========================= */
+$notif_stmt = $conn->prepare("
+    SELECT COUNT(*) as cnt FROM notifications
+    WHERE (user_id = ? AND user_id IS NOT NULL)
+       OR (user_id IS NULL AND role = ?)
+");
+$notif_stmt->bind_param("is", $user_id, $role);
+$notif_stmt->execute();
+$notif_count_row = $notif_stmt->get_result()->fetch_assoc();
+$notif_count = (int) ($notif_count_row['cnt'] ?? 0);
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -48,7 +61,7 @@ $page = $_GET['page'] ?? 'home';
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
 <style>
-/* YOUR DESIGN — UNCHANGED */
+/* (UNCHANGED DESIGN - KEEP YOUR ORIGINAL CSS) */
 * { margin:0; padding:0; box-sizing:border-box; }
 
 :root {
@@ -119,7 +132,6 @@ a:hover {
     border-radius: 50px;
 }
 
-/* main */
 .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
 
 .topbar {
@@ -154,17 +166,24 @@ a:hover {
 
     <?php if ($role === 'admin'): ?>
         <a href="dashboard.php?page=users">👥 Manage Users</a>
-        <a href="dashboard.php?page=products">📦 Products (View Only)</a>
-        <a href="dashboard.php?page=requests">📋 Requests (View Only)</a>
+        <a href="dashboard.php?page=products">📦 Products</a>
+        <a href="dashboard.php?page=overview">📊 Inventory Overview</a>
+        <a href="dashboard.php?page=requests">📋 Requests</a>
+        <a href="dashboard.php?page=logs">📜 Audit Logs</a>
+        <a href="dashboard.php?page=notifications">🔔 Notifications</a>
     <?php endif; ?>
 
     <?php if ($role === 'manager'): ?>
         <a href="dashboard.php?page=products">📦 Products</a>
+        <a href="dashboard.php?page=overview">📊 Inventory Overview</a>
         <a href="dashboard.php?page=requests">📋 Requests</a>
+        <a href="dashboard.php?page=notifications">🔔 Notifications</a>
     <?php endif; ?>
 
     <?php if ($role === 'staff'): ?>
+        <a href="dashboard.php?page=products">📦 View Products</a>
         <a href="dashboard.php?page=my_requests">📝 My Requests</a>
+        <a href="dashboard.php?page=notifications">🔔 Notifications</a>
     <?php endif; ?>
 
     <div class="sidebar-spacer"></div>
@@ -180,8 +199,14 @@ a:hover {
         <div class="topbar-left">
             Welcome, <?= htmlspecialchars($user['username']) ?>
         </div>
-        <div class="topbar-right">
-            <?= htmlspecialchars($role) ?>
+        <div class="topbar-right" style="display:flex;align-items:center;gap:14px;">
+            <?php if ($notif_count > 0): ?>
+            <a href="dashboard.php?page=notifications"
+               style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.3);color:#fbbf24;padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:700;text-decoration:none;">
+                🔔 <?= $notif_count ?> notification<?= $notif_count !== 1 ? 's' : '' ?>
+            </a>
+            <?php endif; ?>
+            <span><?= htmlspecialchars(strtoupper($role)) ?></span>
         </div>
     </div>
 
@@ -200,9 +225,11 @@ a:hover {
 
             case 'products':
                 if ($role === 'admin') {
-                    include 'role_admin_products_view.php';
+                    include 'role_admin_product.php';
                 } elseif ($role === 'manager') {
                     include 'role_manager_product.php';
+                } elseif ($role === 'staff') {
+                    include 'role_staff_products.php';
                 } else {
                     echo '<p style="color:#94a3b8;">⛔ Access denied.</p>';
                 }
@@ -216,16 +243,36 @@ a:hover {
                 }
                 break;
 
-            case 'my_requests':
-                if ($role === 'staff') {
-                    include 'role_staff_request.php';
-                } else {
-                    echo '<p style="color:#94a3b8;">⛔ Access denied.</p>';
-                }
-                break;
+          case 'my_requests':
+    if ($role === 'staff') {
+        include 'role_staff_request.php';
+    } else {
+        echo '<p style="color:#94a3b8;">⛔ Access denied.</p>';
+    }
+    break;
 
-            default:
-                include 'role_home.php';
+case 'overview':
+    if (in_array($role, ['admin', 'manager'])) {
+        include 'role_inventory_overview.php';
+    } else {
+        echo '<p style="color:#94a3b8;">⛔ Access denied.</p>';
+    }
+    break;
+
+case 'logs':
+    if ($role === 'admin') {
+        include 'role_admin_audit.php';
+    } else {
+        echo '<p style="color:#94a3b8;">⛔ Access denied.</p>';
+    }
+    break;
+    case 'notifications':
+    include 'role_notifications.php';
+    break;
+default:
+    include 'role_home.php';
+    break;
+                
         }
         ?>
 

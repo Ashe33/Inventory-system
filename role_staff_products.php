@@ -1,6 +1,10 @@
 <?php
-// Fetch all products - VIEW ONLY
-$products = $conn->query("SELECT * FROM products ORDER BY created_at DESC");
+/* ============================================================
+   STAFF: View Products (Read-Only)
+   Staff can only browse available products, no CRUD
+============================================================ */
+
+$products = $conn->query("SELECT * FROM products ORDER BY name ASC");
 ?>
 
 <style>
@@ -21,6 +25,7 @@ $products = $conn->query("SELECT * FROM products ORDER BY created_at DESC");
     padding: 5px 14px;
     border-radius: 20px;
     margin-bottom: 24px;
+    display: inline-block;
 }
 
 .table-card { background: #1e293b; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden; }
@@ -68,15 +73,29 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     border: 1px solid rgba(248,113,113,0.2);
 }
 
+.qty-zero {
+    background: rgba(107,114,128,0.1); color: #6b7280;
+    border: 1px solid rgba(107,114,128,0.2);
+}
+
+.btn {
+    padding: 6px 12px; border-radius: 8px; border: none;
+    font-weight: 700; font-size: .75rem; cursor: pointer;
+    transition: .2s; text-decoration: none; display: inline-block; text-align: center;
+}
+
+.btn-green { background: #22c55e; color: #000; }
+.btn-green:hover { background: #16a34a; }
+
 .empty-row td { text-align: center; color: #94a3b8; padding: 40px; font-size: .85rem; }
 </style>
 
 <div class="page-title">📦 <span>Products</span></div>
-<div class="view-notice">👁️ View Only — Contact Manager to make changes</div>
+<div class="view-notice">👁️ View Only — Use My Requests to request items</div>
 
 <div class="table-card">
     <div class="table-top">
-        <span>All Products</span>
+        <span>Available Products</span>
         <span class="total-badge"><?= $products ? $products->num_rows : 0 ?> items</span>
     </div>
     <table>
@@ -86,7 +105,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
                 <th>Name</th>
                 <th>Category</th>
                 <th>Stock</th>
-                <th>Added</th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody>
@@ -97,17 +116,25 @@ tr:hover td { background: rgba(255,255,255,0.02); }
                 <td><?= htmlspecialchars($p['name']) ?></td>
                 <td style="color:#94a3b8"><?= htmlspecialchars($p['category'] ?? '—') ?></td>
                 <td>
-                    <span class="qty-badge <?= $p['quantity'] <= 5 ? 'qty-low' : '' ?>">
-                        <?= $p['quantity'] ?>
-                    </span>
+                    <?php if ($p['quantity'] == 0): ?>
+                        <span class="qty-badge qty-zero">Out of Stock</span>
+                    <?php elseif ($p['quantity'] <= 5): ?>
+                        <span class="qty-badge qty-low"><?= $p['quantity'] ?> (Low)</span>
+                    <?php else: ?>
+                        <span class="qty-badge"><?= $p['quantity'] ?></span>
+                    <?php endif; ?>
                 </td>
-                <td style="color:#94a3b8; font-size:.78rem">
-                    <?= date('M d, Y', strtotime($p['created_at'])) ?>
+                <td>
+                    <?php if ($p['quantity'] > 0): ?>
+                        <a href="dashboard.php?page=my_requests" class="btn btn-green" style="font-size:.75rem;">📝 Request</a>
+                    <?php else: ?>
+                        <span style="color:#6b7280; font-size:.78rem;">Unavailable</span>
+                    <?php endif; ?>
                 </td>
             </tr>
             <?php endwhile; ?>
         <?php else: ?>
-            <tr class="empty-row"><td colspan="5">No products yet.</td></tr>
+            <tr class="empty-row"><td colspan="5">No products available yet.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>

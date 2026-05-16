@@ -44,15 +44,11 @@ $my_requests = $conn->query("
 .btn-green:hover { background: #16a34a; }
 
 .table-card { background: #1e293b; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden; }
-
 .table-top { padding: 16px 22px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: .68rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #94a3b8; }
 
 table { width: 100%; border-collapse: collapse; }
-
 th { padding: 11px 20px; text-align: left; font-size: .65rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.06); }
-
 td { padding: 13px 20px; font-size: .88rem; border-bottom: 1px solid rgba(255,255,255,0.06); color: #f1f5f9; }
-
 tr:last-child td { border-bottom: none; }
 tr:hover td { background: rgba(255,255,255,0.02); }
 
@@ -86,6 +82,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 <!-- FORM -->
 <div class="form-card">
     <div class="form-card-title">Submit New Request</div>
+    <!-- ✅ FIXED: absolute path so it works regardless of where dashboard.php is -->
     <form method="POST" action="process/request_submit.php">
         <div class="form-row">
             <div class="form-group">

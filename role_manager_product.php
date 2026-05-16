@@ -134,7 +134,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 <!-- ADD FORM -->
 <div class="form-card">
     <div class="form-card-title">Add New Product</div>
-    <form method="POST" action="process/product_add.php">
+    <form method="POST" action="process/product_add.php" >
         <div class="form-row">
             <div class="form-group">
                 <label class="form-label">Product Name</label>
