@@ -46,9 +46,7 @@ if (count($params) > 0) {
     $audit = $conn->query($sql);
 }
 
-/* ============================================================
-   FETCH DISTINCT ACTIONS FOR FILTER DROPDOWN
-============================================================ */
+
 $actions_result = $conn->query("SELECT DISTINCT action FROM audit_logs ORDER BY action ASC");
 $distinct_actions = [];
 if ($actions_result) {

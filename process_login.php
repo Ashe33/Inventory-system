@@ -1,6 +1,7 @@
 <?php
 session_start();
 include 'config/database.php';
+include 'include/security.php'; // ✅ must contain crypto_decrypt()
 
 $mailerAvailable = false;
 if (file_exists('vendor/autoload.php')) {
@@ -33,51 +34,65 @@ if (empty($username) || empty($password)) {
     exit();
 }
 
+/* =========================
+   FETCH USER
+========================= */
 $stmt = $conn->prepare("SELECT * FROM users WHERE username = ?");
 $stmt->bind_param("s", $username);
 $stmt->execute();
 $result = $stmt->get_result();
 $user   = $result->fetch_assoc();
 
+/* =========================
+   AUTH CHECK
+========================= */
 if (!$user || !password_verify($password, $user['password'])) {
     $_SESSION['login_error'] = "Invalid username or password.";
     header("Location: login.php");
     exit();
 }
 
+/* =========================
+   STATUS CHECK
+========================= */
 if ($user['status'] != 'approved') {
     $_SESSION['login_error'] = "Account not approved yet. Please wait for admin approval.";
     header("Location: login.php");
     exit();
 }
 
+  //EMAIL DECRYPT (FIXED)
+
+$decrypted_email = crypto_decrypt($user['email']);
+
+
+   //EMAIL VALIDATION
+
+if (!$decrypted_email || !filter_var($decrypted_email, FILTER_VALIDATE_EMAIL)) {
+    $_SESSION['login_error'] = "Invalid email on record.";
+    header("Location: login.php");
+    exit();
+}
+
+//check internet
 if (!has_internet()) {
     $_SESSION['login_error'] = "No internet connection detected. OTP required.";
     header("Location: login.php");
     exit();
 }
 
+//mailer check
 if (!$mailerAvailable) {
     $_SESSION['login_error'] = "Email system unavailable.";
     header("Location: login.php");
     exit();
 }
 
-if (!$user['email'] || !filter_var($user['email'], FILTER_VALIDATE_EMAIL)) {
-    $_SESSION['login_error'] = "Invalid email on record.";
-    header("Location: login.php");
-    exit();
-}
 
-/* =========================
-   OTP GENERATION
-========================= */
 $otp        = (string) rand(100000, 999999);
-$otp_expiry = time() + 300; // 5 minutes
+$otp_expiry = time() + 300;
 
-/* =========================
-   SEND EMAIL
-========================= */
+//send email
 $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
 
 try {
@@ -90,10 +105,12 @@ try {
     $mail->Port       = 587;
 
     $mail->setFrom('hoyoajohnashley27@gmail.com', 'StockFlow IMS');
-    $mail->addAddress($user['email']);
+    $mail->addAddress($decrypted_email); // ✅ FIXED
+
     $mail->isHTML(false);
     $mail->Subject = "StockFlow IMS — Your OTP Code";
     $mail->Body    = "Hello {$user['username']},\n\nYour OTP is: {$otp}\n\nThis code expires in 5 minutes.\n\nIf you did not request this, ignore this email.";
+
     $mail->send();
 
 } catch (Exception $e) {
@@ -102,17 +119,13 @@ try {
     exit();
 }
 
-/* =========================
-   SAVE OTP TO DB (after email confirmed sent)
-========================= */
+   //SAVE OTP TO DB
+
 $stmt2 = $conn->prepare("UPDATE users SET otp = ?, otp_expiry = ? WHERE id = ?");
 $stmt2->bind_param("sii", $otp, $otp_expiry, $user['id']);
 $stmt2->execute();
 
-/* =========================
-   SAVE TEMP SESSION
-   — use 'temp_user' so otp_verification_process.php can read it
-========================= */
+//temp sessiom
 $_SESSION['temp_user'] = $user['username'];
 $_SESSION['temp_role'] = $user['role'];
 

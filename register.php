@@ -55,7 +55,7 @@ button:hover { background: #16a34a; }
     <?php endif; ?>
 
     <form action="process_register.php" method="POST">
-        <input type="text" name="fullname" placeholder="Full Name" required>
+        <input type="text" name="fullname" class placeholder="Full Name" required>
         <input type="text" name="username" placeholder="Username" required>
         <input type="email" name="email" placeholder="Email" required>
           <input type="text" name="phonenumber" placeholder="Phone (11 digits)" required>

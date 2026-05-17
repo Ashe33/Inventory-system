@@ -1,19 +1,28 @@
 <?php
 /* ============================================================
    NOTIFICATIONS PAGE
-   - Staff: sees their own personal notifications + staff-role notifications
-   - Manager: sees manager-role notifications
-   - Admin: sees all admin-role notifications
-   Rules:
-   - Personal (user_id = X): shows only to that user
-   - Role-based (user_id = NULL, role = 'staff'/'manager'/'admin'): shows to all in that role
 ============================================================ */
 
 $user_id = (int) $user['id'];
 $role    = $user['role'];
 
 /* ============================================================
-   FETCH NOTIFICATIONS (prepared statement for safety)
+   🔥 ADDED: MARK NOTIFICATIONS AS READ WHEN PAGE OPENS
+============================================================ */
+$mark = $conn->prepare("
+    UPDATE notifications
+    SET is_read = 1
+    WHERE (
+        (user_id = ? AND user_id IS NOT NULL)
+        OR (user_id IS NULL AND role = ?)
+    )
+    AND is_read = 0
+");
+$mark->bind_param("is", $user_id, $role);
+$mark->execute();
+
+/* ============================================================
+   FETCH NOTIFICATIONS
 ============================================================ */
 $stmt = $conn->prepare("
     SELECT * FROM notifications
@@ -27,9 +36,20 @@ $stmt->execute();
 $notifications = $stmt->get_result();
 
 /* ============================================================
-   COUNT UNREAD (optional — for display)
+   COUNT (NOW ONLY UNREAD)
 ============================================================ */
-$total = $notifications->num_rows;
+$count_stmt = $conn->prepare("
+    SELECT COUNT(*) as cnt FROM notifications
+    WHERE (
+        (user_id = ? AND user_id IS NOT NULL)
+        OR (user_id IS NULL AND role = ?)
+    )
+    AND is_read = 0
+");
+$count_stmt->bind_param("is", $user_id, $role);
+$count_stmt->execute();
+$count_row = $count_stmt->get_result()->fetch_assoc();
+$total = (int)($count_row['cnt'] ?? 0);
 
 /* ============================================================
    TYPE STYLING MAP
@@ -41,6 +61,8 @@ $type_styles = [
     'info'    => ['bg' => 'rgba(96,165,250,0.08)', 'border' => 'rgba(96,165,250,0.2)',  'color' => '#60a5fa', 'icon' => 'ℹ️'],
 ];
 ?>
+
+<!-- ❗ EVERYTHING BELOW UNCHANGED (YOUR DESIGN KEPT) -->
 
 <style>
 .page-title { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; margin-bottom: 24px; }
@@ -88,10 +110,10 @@ $type_styles = [
 
 <div class="page-title">
     🔔 <span>Notifications</span>
-    <span class="notif-count"><?= $total ?> total</span>
+    <span class="notif-count"><?= $total ?> new</span>
 </div>
 
-<?php if ($total > 0): ?>
+<?php if ($notifications->num_rows > 0): ?>
 <div class="notif-list">
     <?php while ($n = $notifications->fetch_assoc()):
         $t     = $n['type'] ?? 'info';

@@ -1,6 +1,7 @@
 <?php
 session_start();
 include 'config/database.php';
+include 'include/security.php'; // ✅ ADDED
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
@@ -11,6 +12,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = trim($_POST['email']);
     $password = trim($_POST['password']);
     $confirm = trim($_POST['confirm_password']);
+
+    // Username length check
+    if (strlen($username) < 4) {
+        $_SESSION['msg'] = "Username must be at least 4 characters!";
+        $_SESSION['type'] = "error";
+        header("Location: register.php");
+        exit();
+    }
 
     // Validate phone format only (NOT unique check)
     if (!preg_match('/^\+639\d{9}$/', $phone)) {
@@ -28,15 +37,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit();
     }
 
-    // Password length check
-    if (strlen($password) < 8 || strlen($password) > 16) {
-        $_SESSION['msg'] = "Password must be 8 to 16 characters!";
+    // Strong password validation (ADDED)
+    if (
+        strlen($password) < 8 ||
+        strlen($password) > 16 ||
+        !preg_match('/[a-z]/', $password) ||      // lowercase
+        !preg_match('/[A-Z]/', $password) ||      // uppercase
+        !preg_match('/[0-9]/', $password) ||      // number
+        !preg_match('/[\W_]/', $password)         // special character
+    ) {
+        $_SESSION['msg'] = "Password must be 8–16 characters and include uppercase, lowercase, number, and special character!";
         $_SESSION['type'] = "error";
         header("Location: register.php");
         exit();
     }
 
-    // Hash password
+    // 🔐 ENCRYPT DATA (ADDED)
+    $fullname = crypto_encrypt($fullname);
+    $phone = crypto_encrypt($phone);
+    $email = crypto_encrypt($email);
+
+    // Hash password (UNCHANGED)
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
     $stmt = $conn->prepare("
